@@ -1,0 +1,13 @@
+{
+  "permissions": {
+    "allow": [
+      "WebSearch",
+      "Bash(python:*)",
+      "Bash(pip install:*)",
+      "WebFetch(domain:docs.claude.com)",
+      "Bash(if not exist \"%USERPROFILE%\\.claude\" mkdir \"%USERPROFILE%\\.claude\")"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}
