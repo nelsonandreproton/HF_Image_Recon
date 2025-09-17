@@ -27,12 +27,12 @@ def query_hf_api(image, model_id="nlpconnect/vit-gpt2-image-captioning", fallbac
     logger.info(f"Starting image analysis with primary model: {model_id}")
     
     token = os.getenv('HUGGINGFACE_TOKEN', '').strip()
-    if not token:
-        logger.error("HUGGINGFACE_TOKEN not found in environment variables")
-        raise ValueError("HUGGINGFACE_TOKEN not found in environment variables")
+    if not token or token == 'your_token_here':
+        logger.error("Valid HUGGINGFACE_TOKEN not found in environment variables")
+        raise ValueError("Please set a valid HUGGINGFACE_TOKEN in your .env file")
     
     # Validate token format
-    if not token.startswith('hf_') and token != 'your_token_here':
+    if not token.startswith('hf_'):
         logger.warning("Token doesn't start with 'hf_' - this might be invalid")
     
     # Initialize InferenceClient
@@ -69,7 +69,7 @@ def query_hf_api(image, model_id="nlpconnect/vit-gpt2-image-captioning", fallbac
             # InferenceClient returns string directly, wrap in expected format
             if isinstance(result, str):
                 logger.info(f"Model {model} returned string result of length {len(result)}")
-                return [{"generated_text": result}]
+                return [{"generated_text": result.strip()}]  # Ensure no leading/trailing whitespace
             elif isinstance(result, list) and len(result) > 0:
                 logger.info(f"Model {model} returned list with {len(result)} items")
                 # If it's already a list, ensure proper format
@@ -114,6 +114,29 @@ def analyze_image(image):
     try:
         # Log image input type and details
         logger.info(f"Received image type: {type(image)}")
+        
+        # Validate image size to prevent issues with large images
+        if hasattr(image, 'size'):
+            width, height = image.size
+            megapixels = (width * height) / 1_000_000
+            logger.info(f"Image dimensions: {width}x{height} ({megapixels:.2f} MP)")
+            
+            # Warn if image is very large
+            if megapixels > 20:  # More than 20 megapixels
+                logger.warning(f"Large image detected: {megapixels:.2f} MP")
+                # Optionally resize very large images
+                if megapixels > 50:
+                    logger.info("Resizing extremely large image")
+                    # Resize to a more manageable size while maintaining aspect ratio
+                    max_dimension = 5000
+                    if width > height:
+                        new_width = min(width, max_dimension)
+                        new_height = int(height * (new_width / width))
+                    else:
+                        new_height = min(height, max_dimension)
+                        new_width = int(width * (new_height / height))
+                    image = image.resize((new_width, new_height), Image.LANCZOS)
+                    logger.info(f"Resized image to {new_width}x{new_height}")
         
         if isinstance(image, str):
             logger.info(f"Loading image from path: {image}")
@@ -160,8 +183,8 @@ def analyze_image(image):
         common_objects = ["person", "people", "man", "woman", "child", "car", "tree", "building", "house", "sky", "cloud", "water", "grass", "flower", "animal", "dog", "cat", "bird", "table", "chair", "book", "phone", "computer", "food", "plate", "cup", "bottle", "bag", "road", "street", "window", "door", "light", "sign", "bike", "bicycle", "bus", "train", "boat", "airplane", "traffic", "fire", "stop"]
         
         for obj in common_objects:
-            # Use word boundaries to avoid false positives
-            pattern = r'\b' + re.escape(obj) + r'\b'
+            # More precise pattern matching with word boundaries and optional plurals
+            pattern = r'\b' + re.escape(obj) + r's?\b'
             if re.search(pattern, all_text):
                 visible_objects.append(obj.capitalize())
         
@@ -197,7 +220,7 @@ def analyze_image(image):
         elif "rate limit" in error_msg.lower():
             logger.error("Rate limit error detected")
             return "⚠️ **Rate Limit**: Too many requests. Please wait before trying again.", ""
-        elif "All models failed" in error_msg:
+        elif "all models failed" in error_msg:
             logger.error("All models failed error detected")
             return f"❌ **Model Error**: {error_msg}. Check app.log for detailed error information.", ""
         
@@ -216,18 +239,24 @@ with gr.Blocks(title="AI Image Analyzer", theme=gr.themes.Soft()) as demo:
         with gr.Column():
             elements_output = gr.Markdown(label="Image Elements", value="")
             summary_output = gr.Textbox(label="General Summary", lines=3, max_lines=5)
+            loading_indicator = gr.Markdown(value="⏳ Analyzing image...", visible=False)
+    
+    def on_image_upload_change(image):
+        if image is not None:
+            return [gr.update(visible=True), *analyze_image(image)]
+        return [gr.update(visible=False), "", ""]
     
     analyze_btn.click(
-        fn=analyze_image,
+        fn=lambda image: ["", *analyze_image(image)] if image else ["Please upload an image first.", ""],
         inputs=[image_input],
-        outputs=[elements_output, summary_output]
+        outputs=[loading_indicator, elements_output, summary_output]
     )
     
     # Only auto-analyze on image change, not on manual button click to avoid duplicates
     image_input.upload(
-        fn=analyze_image,
+        fn=on_image_upload_change,
         inputs=[image_input],
-        outputs=[elements_output, summary_output]
+        outputs=[loading_indicator, elements_output, summary_output]
     )
     
     gr.Markdown("### About")
