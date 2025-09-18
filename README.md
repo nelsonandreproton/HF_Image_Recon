@@ -12,15 +12,16 @@ license: mit
 
 # AI Image Analyzer
 
-An intelligent image analysis application that uses state-of-the-art AI models to describe and analyze uploaded images.
+An intelligent image analysis application that uses local Ollama with the Moondream vision model to describe and analyze uploaded images.
 
 ## Features
 
 - **Image Upload**: Easy drag-and-drop or click-to-upload interface
-- **AI-Powered Analysis**: Uses Salesforce's BLIP (Bootstrapping Language-Image Pre-training) model
+- **AI-Powered Analysis**: Uses Moondream vision model via local Ollama
 - **Detailed Elements List**: Identifies and lists objects, people, and elements in the image
 - **General Summary**: Provides a comprehensive description of the overall scene
 - **Real-time Processing**: Instant analysis as soon as an image is uploaded
+- **Local Processing**: No external API calls - everything runs locally
 
 ## How to Use
 
@@ -32,37 +33,44 @@ An intelligent image analysis application that uses state-of-the-art AI models t
 
 ## Technology
 
-- **Models**: nlpconnect/vit-gpt2-image-captioning with fallbacks (git-base-coco, vit-gpt2-coco-en)
-- **API**: Hugging Face Inference API (no local model downloads)
+- **Model**: Moondream vision model (local)
+- **API**: Local Ollama server
 - **Framework**: Gradio 5.x for the web interface
-- **Deployment**: Hugging Face Spaces
+- **Deployment**: Local
 
 ## Model Information
 
 This application uses:
-- **ViT-GPT2** (Vision Transformer + GPT-2) by nlpconnect for primary image captioning
-- **Fallback models** including Microsoft GIT and other ViT-GPT2 variants for reliability
-- **Smart model selection** - automatically tries fallback models if primary model fails
-- All models accessed via Hugging Face's Inference API for fast, efficient processing
+- **Moondream** - A powerful vision language model for image understanding
+- **Local Ollama** - No external API dependencies
+- **Fast processing** - Direct local model inference
 
 ## Setup
 
+### Prerequisites
+
+1. Install Ollama from [ollama.ai](https://ollama.ai)
+2. Pull the Moondream model:
+   ```bash
+   ollama pull moondream:latest
+   ```
+3. Start Ollama (if not running as service):
+   ```bash
+   ollama serve
+   ```
+
 ### Local Development Setup
 
-1. Get a Hugging Face token from [huggingface.co/settings/tokens](https://huggingface.co/settings/tokens)
-2. Copy the `.env` file and replace `your_hf_token_here` with your actual token:
-   ```
-   HUGGINGFACE_TOKEN=hf_your_actual_token_here
-   ```
-3. Install dependencies and run:
+1. Install dependencies and run:
    ```bash
    pip install -r requirements.txt
    python app.py
    ```
 
-### HF Spaces Deployment
-
-For HF Spaces deployment, add your token in the Space settings under "Variables and secrets" as `HUGGINGFACE_TOKEN`
+2. Test the setup:
+   ```bash
+   python test_ollama.py
+   ```
 
 ## Files Structure
 
@@ -70,7 +78,7 @@ For HF Spaces deployment, add your token in the Space settings under "Variables 
 HF_Image_Recon/
 ├── app.py              # Main Gradio application
 ├── requirements.txt    # Python dependencies
-├── .env               # Environment variables (add your HF token here)
+├── test_ollama.py     # Test script for Ollama integration
 ├── .gitignore         # Git ignore file
 └── README.md          # This file
 ```
